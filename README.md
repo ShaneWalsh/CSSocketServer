@@ -30,3 +30,9 @@ heroku ps:scale web=0
 
 Turn off maintaince mode.
 heroku maintenance:off
+
+
+
+NodePackages
+typescript ide requies this guy. so install as project dep
+npm install -save-dev typescript-language-server
