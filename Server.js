@@ -99,6 +99,7 @@ var tavern = io
   .on('connection', function (socket) { // on conection, outlines the calls the connect can make
  	 logg('connected to tavern');
    socket.on('registry', function (data) {
+     // todo add check here to ensure this is a logged in user with a valid token.
      tavernSockets[socket] = data.username;
    });
    socket.on('shout', function (data) {
