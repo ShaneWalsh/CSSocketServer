@@ -145,24 +145,55 @@ var tavern = io
       logg('createParty');
       let partyId = partyIdTicker + "_" +  generateToken({});
       let partyName = data.partyName;
+      let partyDescription = data.partyDescription;
+      let partySize = 1;
       let members = [];
       members.push(partySockets[data.username]);
       let leader = data.username;
       let publicParty = data.publicParty; // if this party is visible in the public party list.
 
       partyIdTicker++;
-      parties[partyId] = {partyId:partyId,partyName:partyName,publicParty:publicParty, members:members, leader:leader};
-      socket.emit('createdParty',{partyId:partyId,partyName:partyName,publicParty:publicParty}); // reply only to the socket that created the party.
+      parties[partyId] = {partyId:partyId,
+                          partyName:partyName,
+                          partyDescription:partyDescription,
+                          partySize:partySize,
+                          publicParty:publicParty,
+                          members:members,
+                          leader:leader};
+      socket.emit('createdParty',{partyId:partyId,partyName:partyName,
+                                  partyDescription:partyDescription,
+                                  partySize:partySize,publicParty:publicParty}); // reply only to the socket that created the party.
       // emit to everyone that there is a new part.
-      party.emit('newParty',{partyId:partyId,partyName:partyName,publicParty:publicParty});
+      party.emit('newParty',{partyId:partyId,partyName:partyName,
+                              partyDescription:partyDescription,
+                              partySize:partySize,publicParty:publicParty});
     });
 
     socket.on('joinParty', function (data) {
       logg('joinParty');
-      // validate its from a logged in user
-     let shoutBack = {username:data.username}; // remove token basically.
-     socket.emit('joinedParty',shoutBack); // let this socket know he is in the party.
-     // now update all of the other members of the same party that this new fella has joined.
+      //todo validate its from a logged in user
+
+     // get the party with the id provided.
+     let party = parties[data.partyId];
+     if(party != undefined && party.partySize < 4){
+       party.partySize += 1; // increment party size
+       party.members.push(partySockets[data.username]); // add new party member
+
+       socket.emit('joinedParty',{partyId:party.partyId}); // let this socket know he is in the party.
+       // now update all of the other members of the same party that this new fella has joined.
+          // can do this with a message in the party chats.
+      let members = party.members;
+      let shoutBack = {username:data.username,shout:"Your new party member is"+data.username}; // todo make this funny strings replacements.
+      for(var h = 0; h < members.length; h++){
+        members[h].emit('shoutBack',shoutBack); // send a chat to everyone connected to chat on this game
+      }
+       // todo now update all of the listening games to update their list of the new party member, increaseing the size.
+       //party.emit('newPartySize',{partyId:partyId, partySize:partySize});
+     } else{
+       logg('No party'+data.partyId);
+       // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
+
+     }
     });
 
     // invite player to party
@@ -178,8 +209,6 @@ var tavern = io
     });
 
   });
-
-
 //gameplaySocket
 // handle the actual in game actions? No, why build the socket group then?
 
