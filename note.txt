@@ -45,3 +45,27 @@ Git Knowledge
 git add -A stages all changes
 git add . stages new files and modifications, without deletions
 git add -u stages modifications and deletions, without new files
+
+
+
+
+Socket Knowledge
+The syntax is confusing in socketio. Also, every socket is automatically connected to their own room with the id socket.id (this is how private chat works in socketio, they use rooms).
+
+Send to the sender and noone else
+
+socket.emit('hello', msg);
+Send to everyone including the sender(if the sender is in the room) in the room "my room"
+
+io.to('my room').emit('hello', msg);
+Send to everyone except the sender(if the sender is in the room) in the room "my room"
+
+socket.broadcast.to('my room').emit('hello', msg);
+Send to everyone in every room, including the sender
+
+io.emit('hello', msg); // short version
+
+io.sockets.emit('hello', msg);
+Send to specific socket only (private chat)
+
+socket.broadcast.to(otherSocket.id).emit('hello', msg);
