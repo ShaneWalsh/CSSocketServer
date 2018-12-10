@@ -199,7 +199,25 @@ var tavern = io
     // invite player to party
 
     // launching quest.
+    socket.on('startQuest', function (data) {
+      logg('startQuest');
+      //todo validate its from a logged in user
 
+     // get the party with the id provided.
+     let party = parties[data.partyId];
+     if(party != undefined){
+
+      let members = party.members;
+      let launchData = {questId:data.questId};
+      for(var h = 0; h < members.length; h++){
+        members[h].emit('launchQuest',launchData); // launch the game for everyone
+      }
+      // todo mark this party as in a game, so it its removed from the inactive parties list.
+     } else{
+       logg('No party'+data.partyId);
+       // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
+     }
+    });
     // vote on item
 
 
