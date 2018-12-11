@@ -218,7 +218,25 @@ var tavern = io
        // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
      }
     });
+
     // vote on item
+    socket.on('voteSubmit', function (data) {
+      logg('voteSubmit');
+      //todo validate its from a logged in user
+
+     // get the party with the id provided.
+     let party = parties[data.partyId];
+     if(party != undefined){
+      let members = party.members;
+      let voteData = {choiceId:data.choiceId};
+      for(var h = 0; h < members.length; h++){
+        members[h].emit('voteEmit',voteData); // pass the vote to everyone
+      }
+     } else{
+       logg('No party'+data.partyId);
+       // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
+     }
+    });
 
 
     socket.on('disconnect', (reason) => { // remove their socket reference
