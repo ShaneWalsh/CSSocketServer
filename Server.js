@@ -179,13 +179,12 @@ var tavern = io
        party.partySize += 1; // increment party size
        party.members.push(partySockets[data.username]); // add new party member
 
-       socket.emit('joinedParty',{partyId:party.partyId}); // let this socket know he is in the party.
        // now update all of the other members of the same party that this new fella has joined.
           // can do this with a message in the party chats.
       let members = party.members;
-      let shoutBack = {username:data.username,shout:"Your new party member is"+data.username}; // todo make this funny strings replacements.
+      let joinedPartyData = {username:data.username,partyId:party.partyId,shout:"Your new party member is"+data.username}; // todo make this funny strings replacements.
       for(var h = 0; h < members.length; h++){
-        members[h].emit('shoutBack',shoutBack); // send a chat to everyone connected to chat on this game
+        members[h].emit('joinedParty',joinedPartyData); // let this socket know he is in the party.
       }
        // todo now update all of the listening games to update their list of the new party member, increaseing the size.
        //party.emit('newPartySize',{partyId:partyId, partySize:partySize});
@@ -228,7 +227,7 @@ var tavern = io
      let party = parties[data.partyId];
      if(party != undefined){
       let members = party.members;
-      let voteData = {choiceId:data.choiceId};
+      let voteData = {choiceId:data.choiceId, username:data.username};
       for(var h = 0; h < members.length; h++){
         members[h].emit('voteEmit',voteData); // pass the vote to everyone
       }
