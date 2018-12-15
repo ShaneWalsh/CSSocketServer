@@ -233,17 +233,16 @@ var tavern = io
      }
     });
 
-    // vote on item
-    socket.on('chosenVote', function (data) {
-      logg('chosenVote');//todo validate its from a logged in user
-
+    // pass some action to all party members.
+    socket.on('partyUpdate', function (data) {
+      logg('partyUpdate:'+data.questActionCode);//todo validate its from a logged in user
      // get the party with the id provided.
      let party = parties[data.partyId];
      if(party != undefined){
       let members = party.members;
-      let voteData = {choiceId:data.choiceId, username:data.username};
+      let voteData = data;//{choiceId:data.choiceId, username:data.username, questActionCode:data.questActionCode, taskData};
       for(var h = 0; h < members.length; h++){
-        members[h].emit('chosenVoteAction',voteData); // pass the vote to everyone
+        members[h].emit('partyUpdateAction',voteData); // pass the vote to everyone
       }
      } else{
        logg('No party'+data.partyId); // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
