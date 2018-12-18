@@ -15,7 +15,8 @@ const server = express()
 const io = socketIO(server);
 //io.set('origins', 'http://localhost:* https://anotherdomain.com:*'); // Come back to this at a later date, when we want to restrcit access.
 
-let usernameTokenMap={};
+let usernameTokenMap={}; // player tokens for security yo.
+let usernamePlayerDataMap={}; // cache for the player data when its loaded from the server.
 let partyIdTicker = 0;
 
 // Logging
@@ -50,7 +51,8 @@ var login = io
     // todo go to the back end, check if this is a valid login, if it is, then log the socket innnnn.
     if(true){
       let token = data.username + generateToken({});
-      let playerData = getPlayerData({username: data.username});
+      let playerData = getPlayerData(data.username);
+      usernamePlayerDataMap[''+data.username] = playerData;
       usernameTokenMap[''+data.username] = token;
       socket.emit('attemptLoginReply',{token:token,playerData:playerData}); // send a replay to only the sender socket.
     } else { // login failed.
@@ -63,10 +65,11 @@ var login = io
   });
 });
 
-function getPlayerData({username}){
-  // todo go to the backend and get the data for username and return it.
-  let playerData = {username:username, character:{name:'funkmachine', level:2, hp:12, str:5, dex:1, int:2}};
-  return playerData;
+function getPlayerData(username){
+  if(!usernamePlayerDataMap[username]){
+      usernamePlayerDataMap[username] = {username:username, character:{name:username, beef:2, brains:3, agility:3, charm:3,aim:3}};
+  }
+  return usernamePlayerDataMap[username];
 }
 
 // create a logout interval
@@ -148,7 +151,7 @@ var tavern = io
       let partyDescription = data.partyDescription;
       let partySize = 1;
       let members = [];
-      members.push(partySockets[data.username]);
+      members.push(data.username);
       let leader = data.username;
       let publicParty = data.publicParty; // if this party is visible in the public party list.
 
@@ -160,12 +163,13 @@ var tavern = io
                           publicParty:publicParty,
                           members:members,
                           leader:leader};
+      let memberData = []; memberData.push( getPlayerData(data.username));
       socket.emit('createdParty',{partyId:partyId,partyName:partyName,
-                                  partyDescription:partyDescription,
+                                  partyDescription:partyDescription,membersData:memberData,
                                   partySize:partySize,publicParty:publicParty}); // reply only to the socket that created the party.
       // emit to everyone that there is a new part.
       party.emit('newParty',{partyId:partyId,partyName:partyName,
-                              partyDescription:partyDescription,
+                              partyDescription:partyDescription,membersData:memberData,
                               partySize:partySize,publicParty:publicParty});
     });
 
@@ -176,21 +180,20 @@ var tavern = io
      let party = parties[data.partyId];
      if(party != undefined && party.partySize < 4){
        party.partySize += 1; // increment party size
-       party.members.push(partySockets[data.username]); // add new party member
+       party.members.push(data.username); // add new party member
 
-       // now update all of the other members of the same party that this new fella has joined.
-          // can do this with a message in the party chats.
-      let members = party.members;
-      let joinedPartyData = {username:data.username,partyId:party.partyId,shout:"Your new party member is"+data.username}; // todo make this funny strings replacements.
-      for(var h = 0; h < members.length; h++){
-        members[h].emit('joinedParty',joinedPartyData); // let this socket know he is in the party.
+       // now update all of the other members of the same party that this new fella has joined. // can do this with a message in the party chats.
+      let membersData = [];
+      for(var h = 0; h < party.members.length; h++){
+        membersData.push(getPlayerData(party.members[h]));
       }
+      emitToEntireParty(party,"joinedParty",{username:data.username,partyId:party.partyId,
+                           membersData:membersData});
        // todo now update all of the listening games to update their list of the new party member, increaseing the size.
        //party.emit('newPartySize',{partyId:partyId, partySize:partySize});
      } else{
-       logg('No party'+data.partyId);
+       logg('No party'+data);
        // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
-
      }
     });
 
@@ -199,19 +202,12 @@ var tavern = io
     // launching quest.
     socket.on('startQuest', function (data) {
       logg('startQuest');//todo validate its from a logged in user
-
-     // get the party with the id provided.
      let party = parties[data.partyId];
      if(party != undefined){
-
-      let members = party.members;
-      let launchData = {questId:data.questId};
-      for(var h = 0; h < members.length; h++){
-        members[h].emit('launchQuest',launchData); // launch the game for everyone
-      }
-      // todo mark this party as in a game, so it its removed from the inactive parties list.
+       emitToEntireParty(party,"launchQuest",{questId:data.questId});
+       // todo mark this party as in a game, so it its removed from the inactive parties list.
      } else{
-       logg('No party'+data.partyId);
+       logg('No party'+data);
        // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
      }
     });
@@ -219,33 +215,22 @@ var tavern = io
     // vote on item
     socket.on('voteSubmit', function (data) {
       logg('voteSubmit');//todo validate its from a logged in user
-
-     // get the party with the id provided.
      let party = parties[data.partyId];
      if(party != undefined){
-      let members = party.members;
-      let voteData = {choiceId:data.choiceId, username:data.username};
-      for(var h = 0; h < members.length; h++){
-        members[h].emit('voteEmit',voteData); // pass the vote to everyone
-      }
+       emitToEntireParty(party,"voteEmit",{choiceId:data.choiceId, username:data.username});
      } else{
-       logg('No party'+data.partyId);// todo invalid party, handle this shit!
+       logg('No party'+data);// todo invalid party, handle this shit!
      }
     });
 
     // pass some action to all party members.
     socket.on('partyUpdate', function (data) {
       logg('partyUpdate:'+data.questActionCode);//todo validate its from a logged in user
-     // get the party with the id provided.
      let party = parties[data.partyId];
      if(party != undefined){
-      let members = party.members;
-      let voteData = data;//{choiceId:data.choiceId, username:data.username, questActionCode:data.questActionCode, taskData};
-      for(var h = 0; h < members.length; h++){
-        members[h].emit('partyUpdateAction',voteData); // pass the vote to everyone
-      }
+      emitToEntireParty(party,"partyUpdateAction",data); //{choiceId:data.choiceId, username:data.username, questActionCode:data.questActionCode, taskData};
      } else{
-       logg('No party'+data.partyId); // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
+       logg('No party'+data); // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
      }
     });
 
@@ -257,6 +242,13 @@ var tavern = io
 
   });
 //gameplaySocket
+
+function emitToEntireParty(party,action,emitData){
+  for(var h = 0; h < party.members.length; h++){
+    partySockets[party.members[h]].emit(action,emitData); // pass data to all members
+  }
+}
+
 // handle the actual in game actions? No, why build the socket group then?
 
 
