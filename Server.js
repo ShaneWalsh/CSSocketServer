@@ -227,6 +227,7 @@ var tavern = io
     socket.on('partyUpdate', function (data) {
       logg('partyUpdate:'+data.questActionCode);//todo validate its from a logged in user
      let party = parties[data.partyId];
+     data.token = ""; // post token validation, remove players token.
      if(party != undefined){
       emitToEntireParty(party,"partyUpdateAction",data); //{choiceId:data.choiceId, username:data.username, questActionCode:data.questActionCode, taskData};
      } else{
