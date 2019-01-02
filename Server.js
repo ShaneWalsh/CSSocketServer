@@ -18,6 +18,7 @@ const io = socketIO(server);
 let usernameTokenMap={}; // player tokens for security yo.
 let usernamePlayerDataMap={}; // cache for the player data when its loaded from the server.
 let partyIdTicker = 0;
+let partyCollection = [];
 
 // Logging
 function logg(message, type="debug"){
@@ -87,6 +88,31 @@ function logLoggedInPlayers(){ // this should only be callable from admin login.
 function removeOldPlayerCred(username){
   logg("Removing Disconnected Player:"+username);
   delete usernameTokenMap[username];
+}
+
+function getAllParties(){
+  if(partyCollection.length == 0){
+    for (var key in parties) {
+      if (parties.hasOwnProperty(key)) {
+        let party = parties[key];
+        let membersData = [];
+        console.log(party.members);
+        console.log(party.members.length);
+        for(var h = 0; h < party.members.length; h++){
+          membersData.push(getPlayerData(party.members[h]));
+        }
+        console.log(membersData);
+        partyCollection.push({partyId:party.partyId,partyName:party.partyName,
+                              partyDescription:party.partyDescription,membersData:membersData,
+                              partySize:party.partySize,publicParty:party.publicParty, leader:party.leader});
+      }
+    }
+  }
+  return partyCollection;
+}
+
+function clearPartiesCollection(){
+  partyCollection = [];
 }
 
 //setTimeout(() => logLoggedInPlayers(), 5000);
@@ -171,17 +197,22 @@ var tavern = io
       party.emit('newParty',{partyId:partyId,partyName:partyName,
                               partyDescription:partyDescription,membersData:memberData,
                               partySize:partySize,publicParty:publicParty});
+      clearPartiesCollection();
+    });
+
+    socket.on('getAllParties', function(data){
+      logg('getAllParties');
+      // todo login validation
+      socket.emit('allExistingParties',{"parties":getAllParties()});
     });
 
     socket.on('joinParty', function (data) {
       logg('joinParty');//todo validate its from a logged in user
-
      // get the party with the id provided.
      let party = parties[data.partyId];
      if(party != undefined && party.partySize < 4){
        party.partySize += 1; // increment party size
        party.members.push(data.username); // add new party member
-
        // now update all of the other members of the same party that this new fella has joined. // can do this with a message in the party chats.
       let membersData = [];
       for(var h = 0; h < party.members.length; h++){
@@ -189,8 +220,7 @@ var tavern = io
       }
       emitToEntireParty(party,"joinedParty",{username:data.username,partyId:party.partyId,
                            membersData:membersData});
-       // todo now update all of the listening games to update their list of the new party member, increaseing the size.
-       //party.emit('newPartySize',{partyId:partyId, partySize:partySize});
+      clearPartiesCollection();
      } else{
        logg('No party'+data);
        // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
