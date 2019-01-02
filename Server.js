@@ -95,15 +95,15 @@ function getAllParties(){
     for (var key in parties) {
       if (parties.hasOwnProperty(key)) {
         let party = parties[key];
-        let membersData = [];
-        console.log(party.members);
-        console.log(party.members.length);
-        for(var h = 0; h < party.members.length; h++){
-          membersData.push(getPlayerData(party.members[h]));
-        }
-        console.log(membersData);
+        // let membersData = [];// we dont need to send this much information to the front end.
+        // console.log(party.members);
+        // console.log(party.members.length);
+        // for(var h = 0; h < party.members.length; h++){
+        //   membersData.push(getPlayerData(party.members[h]));
+        // }
+        // console.log(membersData);
         partyCollection.push({partyId:party.partyId,partyName:party.partyName,
-                              partyDescription:party.partyDescription,membersData:membersData,
+                              partyDescription:party.partyDescription,members:party.members,
                               partySize:party.partySize,publicParty:party.publicParty, leader:party.leader});
       }
     }
@@ -220,6 +220,7 @@ var tavern = io
       }
       emitToEntireParty(party,"joinedParty",{username:data.username,partyId:party.partyId,
                            membersData:membersData});
+      // todo _s add an emit partyUpdated, which will update the party for any users browsing the existing parties, and prevent two people from joining the same party.
       clearPartiesCollection();
      } else{
        logg('No party'+data);
