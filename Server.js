@@ -130,7 +130,7 @@ var tavern = io
  	 logg('connected to tavern');
    socket.on('registry', function (data) {
      // todo add check here to ensure this is a logged in user with a valid token.
-     tavernSockets[socket] = data.username;
+     tavernSockets[socket.id] = data.username;
    });
    socket.on('shout', function (data) {
      // todo validate its from a logged in user, then shout it to every socket listening on this type.
@@ -138,7 +138,13 @@ var tavern = io
     tavern.emit('shoutBack',shoutBack); // send a chat to everyone connected to chat on this game
    });
    socket.on('disconnect', (reason) => { // remove them from the logged in users.
-      removeOldPlayerCred(tavernSockets[socket]);
+     let username = tavernSockets[socket.id];
+     removeOldPlayerCred(username);
+     // todo call handlePlayerDisconnectForParty(username);
+     console.log("Removing disconnected tavern with socket id:"+socket.id);
+     delete tavernSockets[socket.id];
+     console.log("Remaining Sockets"); // todo _s remove this when complete, dont want this hanging around in the output.
+     console.log(tavernSockets)
    });
 
  });
@@ -187,6 +193,7 @@ var tavern = io
                           partyDescription:partyDescription,
                           partySize:partySize,
                           publicParty:publicParty,
+                          questStarted:false, // should not appear in the quest list with a join button if in game. or members size is full.
                           members:members,
                           leader:leader};
       let memberData = []; memberData.push( getPlayerData(data.username));
@@ -278,6 +285,33 @@ var tavern = io
 function emitToEntireParty(party,action,emitData){
   for(var h = 0; h < party.members.length; h++){
     partySockets[party.members[h]].emit(action,emitData); // pass data to all members
+  }
+}
+
+function handlePlayerDisconnectForParty(playerUsername){
+  let playerPartySocket = partySockets[playerUsername];
+  if(playerPartySocket){
+    for (var id in parties) {
+      if (parties.hasOwnProperty(id)) {
+        let party = parties[id];
+        for(var h = 0; h < party.members.length; h++){
+          if(partySockets[party.members[h]] == playerPartySocket){ // we found this guy in a party, safely remove him from the party.
+            if(party.leader == playerUsername ){ //  remove the entire party safely, informing the other players. ORRRRRRRRRR set one of them as the new leader?
+              logg("Removing party "+party.partyName+"due to Disconnected Player Leader :"+playerUsername);
+              delete party.members[playerPartySocket]; // remove the player.
+              emitToEntireParty(party,"leaderDisconnect",{username:playerUsername});// emit to remaining players what happened and appologise.
+              delete parties[party.partyId];// remove the party entirely,
+              // todo _s push parties update to everybody.
+
+            } else {
+              logg("Removing Disconnected Player "+playerUsername+" from party:"+party.partyName);
+              delete party.members[playerPartySocket];
+              emitToEntireParty(party,"playerDisconnect",{username:playerUsername});// emit to remaining players what happened and appologise.
+            }
+          }
+        }
+      }
+    }
   }
 }
 
