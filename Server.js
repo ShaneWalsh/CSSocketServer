@@ -94,7 +94,7 @@ function getAllParties(){
   if(partyCollection.length == 0){
     for (var key in parties) {
       if (parties.hasOwnProperty(key)) {
-        let party = parties[key];
+        let partyInstance = parties[key];
         // let membersData = [];// we dont need to send this much information to the front end.
         // console.log(party.members);
         // console.log(party.members.length);
@@ -102,9 +102,9 @@ function getAllParties(){
         //   membersData.push(getPlayerData(party.members[h]));
         // }
         // console.log(membersData);
-        partyCollection.push({partyId:party.partyId,partyName:party.partyName,
-                              partyDescription:party.partyDescription,members:party.members,
-                              partySize:party.partySize,publicParty:party.publicParty, leader:party.leader});
+        partyCollection.push({partyId:partyInstance.partyId,partyName:partyInstance.partyName,
+                              partyDescription:partyInstance.partyDescription,members:partyInstance.members,
+                              partySize:partyInstance.partySize,publicParty:partyInstance.publicParty, leader:partyInstance.leader});
       }
     }
   }
@@ -140,6 +140,7 @@ var tavern = io
    socket.on('disconnect', (reason) => { // remove them from the logged in users.
      let username = tavernSockets[socket.id];
      removeOldPlayerCred(username);
+     handlePlayerDisconnectForParty(username);
      // todo call handlePlayerDisconnectForParty(username);
      console.log("Removing disconnected tavern with socket id:"+socket.id);
      delete tavernSockets[socket.id];
@@ -162,7 +163,7 @@ var tavern = io
 // party id : 5 users 5 does event. broacast to all on party.
 
  var partyChat = '/party';
- var party = io
+ var partyIo = io
    .of(partyChat)
    .on('connection', function (socket) { // on conection, outlines the calls the connect can make
   	 logg('connected to party');
@@ -173,7 +174,7 @@ var tavern = io
       // validate its from a logged in user, then shout it to every socket listening on this type.
      let shoutBack = {username:data.username,shout:data.shout}; // remove token basically.
      // todo loop on the member sockets of the group and send the shout to them all.
-     party.emit('shoutBack',shoutBack); // send a chat to everyone connected to chat on this game
+     partyIo.emit('shoutBack',shoutBack); // send a chat to everyone connected to chat on this game
     });
 
     socket.on('createParty', function(data){
@@ -199,9 +200,9 @@ var tavern = io
       let memberData = []; memberData.push( getPlayerData(data.username));
       socket.emit('createdParty',{partyId:partyId,partyName:partyName,
                                   partyDescription:partyDescription,membersData:memberData,
-                                  partySize:partySize,publicParty:publicParty}); // reply only to the socket that created the party.
+                                  partySize:partySize,publicParty:publicParty}); // reply only to the socket that created the partyIo
       // emit to everyone that there is a new part.
-      party.emit('newParty',{partyId:partyId,partyName:partyName,
+      partyIo.emit('newParty',{partyId:partyId,partyName:partyName,
                               partyDescription:partyDescription,membersData:memberData,
                               partySize:partySize,publicParty:publicParty});
       clearPartiesCollection();
@@ -216,16 +217,16 @@ var tavern = io
     socket.on('joinParty', function (data) {
       logg('joinParty');//todo validate its from a logged in user
      // get the party with the id provided.
-     let party = parties[data.partyId];
-     if(party != undefined && party.partySize < 4){
-       party.partySize += 1; // increment party size
-       party.members.push(data.username); // add new party member
+     let partyInstance = parties[data.partyId];
+     if(partyInstance != undefined && partyInstance.partySize < 4){
+       partyInstance.partySize += 1; // increment party size
+       partyInstance.members.push(data.username); // add new party member
        // now update all of the other members of the same party that this new fella has joined. // can do this with a message in the party chats.
       let membersData = [];
-      for(var h = 0; h < party.members.length; h++){
-        membersData.push(getPlayerData(party.members[h]));
+      for(var h = 0; h < partyInstance.members.length; h++){
+        membersData.push(getPlayerData(partyInstance.members[h]));
       }
-      emitToEntireParty(party,"joinedParty",{username:data.username,partyId:party.partyId,
+      emitToEntireParty(partyInstance,"joinedParty",{username:data.username,partyId:partyInstance.partyId,
                            membersData:membersData});
       // todo _s add an emit partyUpdated, which will update the party for any users browsing the existing parties, and prevent two people from joining the same party.
       clearPartiesCollection();
@@ -240,9 +241,9 @@ var tavern = io
     // launching quest.
     socket.on('startQuest', function (data) {
       logg('startQuest');//todo validate its from a logged in user
-     let party = parties[data.partyId];
-     if(party != undefined){
-       emitToEntireParty(party,"launchQuest",{questId:data.questId});
+     let partyInstance = parties[data.partyId];
+     if(partyInstance != undefined){
+       emitToEntireParty(partyInstance,"launchQuest",{questId:data.questId});
        // todo mark this party as in a game, so it its removed from the inactive parties list.
      } else{
        logg('No party'+data);
@@ -253,9 +254,9 @@ var tavern = io
     // vote on item
     socket.on('voteSubmit', function (data) {
       logg('voteSubmit');//todo validate its from a logged in user
-     let party = parties[data.partyId];
-     if(party != undefined){
-       emitToEntireParty(party,"voteEmit",{choiceId:data.choiceId, username:data.username});
+     let partyInstance = parties[data.partyId];
+     if(partyInstance != undefined){
+       emitToEntireParty(partyInstance,"voteEmit",{choiceId:data.choiceId, username:data.username});
      } else{
        logg('No party'+data);// todo invalid party, handle this shit!
      }
@@ -264,10 +265,10 @@ var tavern = io
     // pass some action to all party members.
     socket.on('partyUpdate', function (data) {
       logg('partyUpdate:'+data.questActionCode);//todo validate its from a logged in user
-     let party = parties[data.partyId];
+     let partyInstance = parties[data.partyId];
      data.token = ""; // post token validation, remove players token.
-     if(party != undefined){
-      emitToEntireParty(party,"partyUpdateAction",data); //{choiceId:data.choiceId, username:data.username, questActionCode:data.questActionCode, taskData};
+     if(partyInstance != undefined){
+      emitToEntireParty(partyInstance,"partyUpdateAction",data); //{choiceId:data.choiceId, username:data.username, questActionCode:data.questActionCode, taskData};
      } else{
        logg('No party'+data); // todo invalid party, handle this shit! Send a error response to the client so it can flash to the user that operation failed.
      }
@@ -282,9 +283,9 @@ var tavern = io
   });
 //gameplaySocket
 
-function emitToEntireParty(party,action,emitData){
-  for(var h = 0; h < party.members.length; h++){
-    partySockets[party.members[h]].emit(action,emitData); // pass data to all members
+function emitToEntireParty(partyInstance,action,emitData){
+  for(var h = 0; h < partyInstance.members.length; h++){
+    partySockets[partyInstance.members[h]].emit(action,emitData); // pass data to all members
   }
 }
 
@@ -293,21 +294,24 @@ function handlePlayerDisconnectForParty(playerUsername){
   if(playerPartySocket){
     for (var id in parties) {
       if (parties.hasOwnProperty(id)) {
-        let party = parties[id];
-        for(var h = 0; h < party.members.length; h++){
-          if(partySockets[party.members[h]] == playerPartySocket){ // we found this guy in a party, safely remove him from the party.
-            if(party.leader == playerUsername ){ //  remove the entire party safely, informing the other players. ORRRRRRRRRR set one of them as the new leader?
-              logg("Removing party "+party.partyName+"due to Disconnected Player Leader :"+playerUsername);
-              delete party.members[playerPartySocket]; // remove the player.
-              emitToEntireParty(party,"leaderDisconnect",{username:playerUsername});// emit to remaining players what happened and appologise.
-              delete parties[party.partyId];// remove the party entirely,
+        let partyInstance = parties[id];
+        for(var h = 0; h < partyInstance.members.length; h++){
+          if(partySockets[partyInstance.members[h]] == playerPartySocket){ // we found this guy in a party, safely remove him from the party.
+            if(partyInstance.leader == playerUsername ){ //  remove the entire party safely, informing the other players. ORRRRRRRRRR set one of them as the new leader?
+              logg("Removing party "+partyInstance.partyName+"due to Disconnected Player Leader :"+playerUsername);
+              delete partyInstance.members[playerPartySocket]; // remove the player.
+              emitToEntireParty(partyInstance,"leaderDisconnect",{username:playerUsername});// emit to remaining players what happened and appologise.
+              delete parties[partyInstance.partyId];// remove the party entirely,
+              clearPartiesCollection();
               // todo _s push parties update to everybody.
 
             } else {
-              logg("Removing Disconnected Player "+playerUsername+" from party:"+party.partyName);
-              delete party.members[playerPartySocket];
-              emitToEntireParty(party,"playerDisconnect",{username:playerUsername});// emit to remaining players what happened and appologise.
+              logg("Removing Disconnected Player "+playerUsername+" from party:"+partyInstance.partyName);
+              delete partyInstance.members[playerPartySocket];
+              emitToEntireParty(partyInstance,"playerDisconnect",{username:playerUsername});// emit to remaining players what happened and appologise.
+              clearPartiesCollection();
             }
+            partyIo.emit('partyDestroyed',{partyId:partyInstance.partyId});
           }
         }
       }
