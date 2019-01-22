@@ -300,6 +300,7 @@ function handlePlayerDisconnectForParty(playerUsername){
             if(partyInstance.leader == playerUsername ){ //  remove the entire party safely, informing the other players. ORRRRRRRRRR set one of them as the new leader?
               logg("Removing party "+partyInstance.partyName+"due to Disconnected Player Leader :"+playerUsername);
               delete partyInstance.members[playerPartySocket]; // remove the player.
+              // todo _s add handling on the frontend for this event.
               emitToEntireParty(partyInstance,"leaderDisconnect",{username:playerUsername});// emit to remaining players what happened and appologise.
               delete parties[partyInstance.partyId];// remove the party entirely,
               clearPartiesCollection();
@@ -308,6 +309,7 @@ function handlePlayerDisconnectForParty(playerUsername){
             } else {
               logg("Removing Disconnected Player "+playerUsername+" from party:"+partyInstance.partyName);
               delete partyInstance.members[playerPartySocket];
+              // todo _s add handling for this on the front end.
               emitToEntireParty(partyInstance,"playerDisconnect",{username:playerUsername});// emit to remaining players what happened and appologise.
               clearPartiesCollection();
             }
